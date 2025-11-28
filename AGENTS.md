@@ -10,7 +10,7 @@
 - `src/tiangong_ai_workspace/agents/`:
   - `workflows.py`: LangChain/LangGraph document workflows (reports, plans, patent, proposals).
   - `deep_agent.py`: Workspace autonomous agent supporting both native LangGraph loops and the `deepagents` runtime.
-  - `tools.py`: LangChain Tool wrappers for shell/Python execution, Tavily search, and document generation (with typed Pydantic schemas).
+  - `tools.py`: LangChain Tool wrappers for shell/Python execution, Tavily search, Neo4j CRUD, and document generation (with typed Pydantic schemas).
 - `src/tiangong_ai_workspace/tooling/`: Utilities shared by agents.
   - `responses.py`: `WorkspaceResponse` envelope for deterministic outputs.
   - `registry.py`: Tool metadata registry surfaced via `tiangong-workspace tools --catalog`.
@@ -18,6 +18,7 @@
   - `tool_schemas.py`: Pydantic schemas exported to LangChain tools and registry metadata.
   - `llm.py`: Provider-agnostic model router (OpenAI provider registered by default).
   - `tavily.py`: Tavily MCP client with retry + structured payloads.
+  - `neo4j.py`: Neo4j driver wrapper used by CRUD tools and registry metadata.
   - `executors.py`: Shell/Python execution helpers with timeouts, allow-lists, and structured telemetry for agent consumption.
 - `src/tiangong_ai_workspace/templates/`: Markdown scaffolds referenced by workflows.
 - `.sercrets/secrets.toml`: Local-only secrets (copy from `.sercrets/secrets.example.toml`).
@@ -62,6 +63,7 @@ Use `--json` for machine-readable responses suitable for chaining agents.
 - Populate `.sercrets/secrets.toml` using the example file.
 - Required: `openai.api_key`. Optional: `model`, `chat_model`, `deep_research_model`.
 - Tavily section needs `service_name`, `url`, and `api_key` (`Authorization: Bearer` header).
+- Neo4j section (optional) defines `uri`, `username`, `password`, and `database`; when absent the Neo4j LangChain tool is automatically disabled.
 - Secrets stay local; never commit `.sercrets/`.
 
 ## Maintenance Rules
@@ -76,6 +78,7 @@ Use `--json` for machine-readable responses suitable for chaining agents.
 - Register new workflows via `tooling.registry.register_tool` for discoverability.
 - Shell/Python executors enforce configurable timeouts and command allow-lists—reuse them instead of invoking `subprocess` or `exec` directly.
 - LangChain tools should depend on the schemas in `tooling.tool_schemas` so registry metadata stays consistent.
+- Neo4j automation lives in `tooling.neo4j`; reuse `Neo4jClient` + `Neo4jCommand*` schemas to expose graph operations or add migrations/tests.
 - Choose the DeepAgents backend via `--engine deepagents` when you need its filesystem/todo middleware; ensure the supplied LLM implements `BaseChatModel`.
 - Keep logs redaction-aware if adding persistence; avoid leaking API keys.
 - Workspace agent factory accepts `model`, `include_*` flags, and additional tools/subagents. Reuse `tooling.executors` or extend `agents/tools.py` when exposing new capabilities to autonomous agents.

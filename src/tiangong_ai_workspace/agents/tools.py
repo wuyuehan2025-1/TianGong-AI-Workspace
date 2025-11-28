@@ -9,10 +9,13 @@ from typing import Any, Mapping, Optional
 from langchain_core.tools import tool
 
 from ..tooling.executors import PythonExecutor, ShellExecutor
+from ..tooling.neo4j import Neo4jClient, Neo4jToolError
 from ..tooling.tavily import TavilySearchClient, TavilySearchError
 from ..tooling.tool_schemas import (
     DocumentToolInput,
     DocumentToolOutput,
+    Neo4jCommandInput,
+    Neo4jCommandOutput,
     PythonCommandInput,
     PythonCommandOutput,
     ShellCommandInput,
@@ -24,6 +27,7 @@ from .workflows import DocumentWorkflowConfig, DocumentWorkflowType, run_documen
 
 __all__ = [
     "create_document_tool",
+    "create_neo4j_tool",
     "create_python_tool",
     "create_shell_tool",
     "create_tavily_tool",
@@ -74,6 +78,30 @@ def create_tavily_tool(client: Optional[TavilySearchClient] = None, *, name: str
         return payload.model_dump()
 
     return tavily_search
+
+
+def create_neo4j_tool(client: Optional[Neo4jClient] = None, *, name: str = "run_neo4j_query") -> Any:
+    neo4j_client = client or Neo4jClient()
+
+    @tool(name, args_schema=Neo4jCommandInput)
+    def run_neo4j_query(
+        statement: str,
+        operation: str = "read",
+        parameters: Optional[Mapping[str, Any]] = None,
+        database: str | None = None,
+    ) -> Mapping[str, Any]:
+        """Execute a Cypher statement against the configured Neo4j database."""
+
+        try:
+            result = neo4j_client.execute(statement, parameters=parameters, operation=operation, database=database)
+        except Neo4jToolError as exc:
+            payload = Neo4jCommandOutput(status="error", message=str(exc))
+            return payload.model_dump()
+
+        payload = Neo4jCommandOutput(status="success", records=result.get("records"), summary=result.get("summary"))
+        return payload.model_dump()
+
+    return run_neo4j_query
 
 
 def create_document_tool(*, name: str = "generate_document") -> Any:

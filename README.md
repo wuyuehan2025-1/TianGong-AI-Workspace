@@ -12,7 +12,7 @@
 - `src/tiangong_ai_workspace/`：工作区 Python 包与 CLI 入口。
   - `cli.py`：Typer CLI，包含 `docs`、`agents`、`research` 与 `mcp` 子命令。
   - `agents/`：LangGraph 文档工作流 (`workflows.py`)、LangGraph/DeepAgents 双引擎自主智能体 (`deep_agent.py`)、具备 Pydantic 入参与输出校验的 LangChain Tool 封装 (`tools.py`)。
-  - `tooling/`：响应封装、工作区配置加载 (`config.py`)、工具注册表、模型路由器 (`llm.py`)、统一 Tool Schema (`tool_schemas.py`)、Tavily MCP 搜索客户端以及带审计的 Shell/Python 执行器。
+  - `tooling/`：响应封装、工作区配置加载 (`config.py`)、工具注册表、模型路由器 (`llm.py`)、统一 Tool Schema (`tool_schemas.py`)、Tavily MCP 搜索客户端、Neo4j 图数据库客户端 (`neo4j.py`) 以及带审计的 Shell/Python 执行器。
   - `templates/`：不同文档类型的结构提示。
   - `mcp_client.py`：同步封装的 MCP 客户端。
   - `secrets.py`：凭证加载逻辑。
@@ -81,6 +81,7 @@ uv run tiangong-workspace agents run "统计 data.csv 中的指标并绘图" --n
 - Python 执行器：在共享解释器中运行脚本，可直接使用 `pandas`、`matplotlib`、`seaborn` 等依赖。
 - Tavily 搜索：通过 MCP 获取实时互联网情报。
 - LangGraph 文档工作流：生成报告、计划书、专利交底书、项目申报书。
+- Neo4j 图数据库：通过 `neo4j` 官方驱动执行 Cypher，并支持 create/read/update/delete 全流程操作。
 
 可使用 `--no-shell`、`--no-python`、`--no-tavily`、`--no-document` 分别关闭对应工具；`--engine langgraph|deepagents` 切换运行后端；`--system-prompt` 和 `--model` 可自定义智能体设定。
 
@@ -127,6 +128,16 @@ url = "https://mcp.tavily.com/mcp"
 api_key = "<YOUR_TAVILY_API_KEY>"
 api_key_header = "Authorization"
 api_key_prefix = "Bearer"
+```
+
+4. 按需在 `[neo4j]` 区块填入图数据库连接信息（未配置时智能体会自动跳过 Neo4j 工具）：
+
+```toml
+[neo4j]
+uri = "bolt://localhost:7687"
+username = "neo4j"
+password = "<YOUR_NEO4J_PASSWORD>"
+database = "neo4j"
 ```
 
 ## 自定义集成

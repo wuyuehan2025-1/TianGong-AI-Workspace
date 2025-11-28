@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Mapping
 
 import pytest
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -10,8 +10,9 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.runnables import Runnable
 
 from tiangong_ai_workspace.agents.deep_agent import build_workspace_deep_agent
-from tiangong_ai_workspace.secrets import MCPServerSecrets, Secrets
+from tiangong_ai_workspace.secrets import MCPServerSecrets, Neo4jSecrets, Secrets
 from tiangong_ai_workspace.tooling import PythonExecutor, ShellExecutor, WorkspaceResponse, list_registered_tools
+from tiangong_ai_workspace.tooling.neo4j import Neo4jClient, Neo4jToolError
 from tiangong_ai_workspace.tooling.tavily import TavilySearchClient, TavilySearchError
 
 
@@ -65,6 +66,24 @@ def test_python_executor_captures_output() -> None:
     result = executor.run("print('hi')")
     assert "hi" in result.stdout
     assert result.stderr == ""
+
+
+def test_neo4j_client_executes_with_stub_driver() -> None:
+    stub_result = _StubNeo4jResult([{"name": "workspace"}])
+    stub_driver = _StubNeo4jDriver(stub_result)
+    config = Neo4jSecrets(uri="bolt://localhost:7687", username="neo4j", password="pass", database="neo4j")
+    client = Neo4jClient(config=config, driver=stub_driver)
+
+    payload = client.execute("MATCH (n) RETURN n", operation="read", parameters={"limit": 1})
+
+    assert payload["records"] == [{"name": "workspace"}]
+    assert payload["summary"]["database"] == "neo4j"
+    assert payload["summary"]["counters"]["nodes_created"] == 1
+
+
+def test_neo4j_client_without_configuration_raises() -> None:
+    with pytest.raises(Neo4jToolError):
+        Neo4jClient(secrets=Secrets(openai=None, mcp_servers={}, neo4j=None))
 
 
 class StubPlanner(Runnable):
@@ -129,3 +148,68 @@ def test_build_workspace_deep_agent_deepagents_engine(monkeypatch: pytest.Monkey
     assert agent is stub_agent
     assert getattr(fake_create_deep_agent, "called", False)
     assert "tools" in getattr(fake_create_deep_agent, "kwargs", {})
+
+
+class _StubNeo4jRecord:
+    def __init__(self, payload: Mapping[str, Any]) -> None:
+        self._payload = dict(payload)
+
+    def data(self) -> Mapping[str, Any]:
+        return dict(self._payload)
+
+
+class _StubCounters:
+    nodes_created = 1
+    contains_updates = True
+
+    def ignored_method(self) -> None:  # pragma: no cover - ensures callable is skipped
+        return None
+
+
+class _StubSummary:
+    def __init__(self) -> None:
+        self.query = type("Q", (), {"text": "MATCH ()"})()
+        self.database = "neo4j"
+        self.query_type = "r"
+        self.result_available_after = 1
+        self.result_consumed_after = 2
+        self.counters = _StubCounters()
+
+
+class _StubNeo4jResult:
+    def __init__(self, records: list[Mapping[str, Any]]) -> None:
+        self._records = [_StubNeo4jRecord(record) for record in records]
+
+    def __iter__(self):  # type: ignore[override]
+        return iter(self._records)
+
+    def consume(self) -> _StubSummary:
+        return _StubSummary()
+
+
+class _StubNeo4jSession:
+    def __init__(self, result: _StubNeo4jResult) -> None:
+        self._result = result
+
+    def run(self, statement: str, parameters: Mapping[str, Any] | None = None) -> _StubNeo4jResult:  # noqa: D401
+        self.statement = statement
+        self.parameters = parameters or {}
+        return self._result
+
+    def __enter__(self) -> "_StubNeo4jSession":
+        return self
+
+    def __exit__(self, *args: Any) -> None:  # pragma: no cover - no cleanup
+        return None
+
+
+class _StubNeo4jDriver:
+    def __init__(self, result: _StubNeo4jResult) -> None:
+        self._result = result
+
+    def session(self, **kwargs: Any) -> _StubNeo4jSession:
+        self.session_kwargs = kwargs
+        return _StubNeo4jSession(self._result)
+
+    def close(self) -> None:  # pragma: no cover - no-op
+        return None

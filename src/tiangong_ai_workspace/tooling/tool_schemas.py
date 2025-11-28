@@ -15,6 +15,8 @@ from pydantic import BaseModel, Field
 __all__ = [
     "DocumentToolInput",
     "DocumentToolOutput",
+    "Neo4jCommandInput",
+    "Neo4jCommandOutput",
     "PythonCommandInput",
     "PythonCommandOutput",
     "ShellCommandInput",
@@ -66,6 +68,29 @@ class TavilySearchOutput(BaseModel):
     message: str | None = None
 
 
+class Neo4jCommandInput(BaseModel):
+    operation: Literal["create", "read", "update", "delete"] = Field(
+        "read",
+        description="CRUD operation type; determines access mode for the Cypher query.",
+    )
+    statement: str = Field(..., description="Cypher statement to execute against Neo4j.")
+    parameters: Mapping[str, Any] | None = Field(
+        default=None,
+        description="Optional parameter dictionary passed to the Cypher statement.",
+    )
+    database: str | None = Field(
+        default=None,
+        description="Optional database override; falls back to the configured default.",
+    )
+
+
+class Neo4jCommandOutput(BaseModel):
+    status: Literal["success", "error"]
+    records: list[Mapping[str, Any]] | None = None
+    summary: Mapping[str, Any] | None = None
+    message: str | None = None
+
+
 class DocumentToolInput(BaseModel):
     workflow: DocumentWorkflowKey = Field(..., description="Document workflow identifier.")
     topic: str = Field(..., description="Topic or subject for the document.")
@@ -91,6 +116,7 @@ _DESCRIPTOR_SCHEMAS: Mapping[str, _SchemaPair] = {
     "runtime.shell": _SchemaPair(ShellCommandInput, ShellCommandOutput),
     "runtime.python": _SchemaPair(PythonCommandInput, PythonCommandOutput),
     "research.tavily": _SchemaPair(TavilySearchInput, TavilySearchOutput),
+    "database.neo4j": _SchemaPair(Neo4jCommandInput, Neo4jCommandOutput),
     "docs.report": _SchemaPair(DocumentToolInput, DocumentToolOutput),
     "docs.patent_disclosure": _SchemaPair(DocumentToolInput, DocumentToolOutput),
     "docs.plan": _SchemaPair(DocumentToolInput, DocumentToolOutput),

@@ -99,6 +99,13 @@ entrypoint = "tiangong_ai_workspace.tooling.tavily.TavilySearchClient.search"
 tags = ["research", "search"]
 
 [[tool.tiangong.workspace.tool_registry]]
+name = "database.neo4j"
+description = "Execute Cypher queries against the configured Neo4j graph database."
+category = "integration"
+entrypoint = "tiangong_ai_workspace.tooling.neo4j.Neo4jClient.execute"
+tags = ["database", "graph", "neo4j"]
+
+[[tool.tiangong.workspace.tool_registry]]
 name = "agents.deep"
 description = "Workspace autonomous agent built with LangGraph (shell, Python, Tavily, document workflows)."
 category = "agent"

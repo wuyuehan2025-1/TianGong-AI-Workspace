@@ -22,8 +22,9 @@ from langchain_core.runnables import Runnable
 from langgraph.graph import END, StateGraph
 
 from ..tooling.llm import ModelRouter
+from ..tooling.neo4j import Neo4jToolError
 from ..tooling.tavily import TavilySearchClient, TavilySearchError
-from .tools import create_document_tool, create_python_tool, create_shell_tool, create_tavily_tool
+from .tools import create_document_tool, create_neo4j_tool, create_python_tool, create_shell_tool, create_tavily_tool
 
 __all__ = ["build_workspace_deep_agent", "WorkspaceAgentConfig"]
 
@@ -48,9 +49,11 @@ class WorkspaceAgentConfig:
     system_prompt: str | None = None
 
 
-DEFAULT_SYSTEM_PROMPT = """You are the TianGong Workspace orchestrator.
+_TOOL_SENTINEL = "Available tools: shell, python, tavily, document, neo4j."
+
+DEFAULT_SYSTEM_PROMPT = f"""You are the TianGong Workspace orchestrator.
 - Plan multi-step solutions and choose the best tool for each step.
-- Available tools: shell, python, tavily, document. Use shell/python for code or CLI tasks, tavily for web research, document for structured drafts.
+- {_TOOL_SENTINEL} Use shell/python for code or CLI tasks, tavily for web research, document for structured drafts.
 - Think step-by-step. When you decide to finish, return a concise, helpful summary of the work performed.
 - Always respond using JSON with keys: thought, action, input, final_response (only set when action is \"finish\")."""
 
@@ -66,6 +69,7 @@ def build_workspace_deep_agent(
     include_python: bool = True,
     include_tavily: bool = True,
     include_document_agent: bool = True,
+    include_neo4j: bool = True,
     system_prompt: str | None = None,
     max_iterations: int = 8,
     engine: str = "langgraph",
@@ -96,6 +100,7 @@ def build_workspace_deep_agent(
         include_python=include_python,
         include_tavily=include_tavily,
         include_document_agent=include_document_agent,
+        include_neo4j=include_neo4j,
     )
 
     engine_choice = engine.lower().strip()
@@ -118,6 +123,7 @@ def _initialise_tools(
     include_python: bool,
     include_tavily: bool,
     include_document_agent: bool,
+    include_neo4j: bool,
 ) -> Mapping[str, Any]:
     tool_mapping: MutableMapping[str, Any] = {}
 
@@ -134,6 +140,11 @@ def _initialise_tools(
             pass
     if include_document_agent:
         tool_mapping["document"] = create_document_tool()
+    if include_neo4j:
+        try:
+            tool_mapping["neo4j"] = create_neo4j_tool()
+        except Neo4jToolError:
+            pass
 
     return tool_mapping
 
@@ -234,7 +245,7 @@ def _build_planner_chain(
 
 
 def _compose_system_prompt(tool_list: str, custom_prompt: str | None) -> str:
-    base = DEFAULT_SYSTEM_PROMPT.replace("Available tools: shell, python, tavily, document.", f"Available tools:\n{tool_list}")
+    base = DEFAULT_SYSTEM_PROMPT.replace(_TOOL_SENTINEL, f"Available tools:\n{tool_list}")
     if custom_prompt:
         return f"{custom_prompt.strip()}\n\n{base}"
     return base

@@ -63,11 +63,22 @@ class MCPServerSecrets:
 
 
 @dataclass(slots=True)
+class Neo4jSecrets:
+    """Credentials required to connect to a Neo4j database."""
+
+    uri: str
+    username: str
+    password: str
+    database: Optional[str] = None
+
+
+@dataclass(slots=True)
 class Secrets:
     """Container bundling all supported secret entries."""
 
     openai: Optional[OpenAISecrets]
     mcp_servers: Mapping[str, MCPServerSecrets]
+    neo4j: Optional[Neo4jSecrets] = None
 
 
 def discover_secrets_path() -> Path:
@@ -121,7 +132,21 @@ def load_secrets(path: Optional[Path] = None) -> Secrets:
             timeout=_get_opt_float(section, "timeout"),
         )
 
-    return Secrets(openai=openai_secrets, mcp_servers=dict(mcp_entries))
+    neo4j_data = data.get("neo4j")
+    neo4j_secrets = None
+    if isinstance(neo4j_data, Mapping):
+        uri = _get_opt_str(neo4j_data, "uri")
+        username = _get_opt_str(neo4j_data, "username")
+        password = _get_opt_str(neo4j_data, "password")
+        if uri and username and password:
+            neo4j_secrets = Neo4jSecrets(
+                uri=uri,
+                username=username,
+                password=password,
+                database=_get_opt_str(neo4j_data, "database"),
+            )
+
+    return Secrets(openai=openai_secrets, mcp_servers=dict(mcp_entries), neo4j=neo4j_secrets)
 
 
 def _get_opt_str(container: Mapping[str, Any], key: str) -> Optional[str]:
@@ -156,6 +181,7 @@ __all__ = [
     "DEFAULT_SECRETS_PATH",
     "MCPServerSecrets",
     "OpenAISecrets",
+    "Neo4jSecrets",
     "Secrets",
     "discover_secrets_path",
     "load_secrets",
