@@ -585,8 +585,8 @@ def openalex_work(
 @openalex_app.command("cited-by")
 def openalex_cited_by(
     work_id: str = typer.Argument(..., help="OpenAlex work ID (e.g. W2072484418)."),
-    from_publication_date: Optional[str] = typer.Option(None, "--from", "from_pub", help="Filter citing works published on/after this date (YYYY-MM-DD)."),
-    to_publication_date: Optional[str] = typer.Option(None, "--to", "to_pub", help="Filter citing works published on/before this date (YYYY-MM-DD)."),
+    from_publication_date: Optional[str] = typer.Option(None, "--from", help="Filter citing works published on/after this date (YYYY-MM-DD)."),
+    to_publication_date: Optional[str] = typer.Option(None, "--to", help="Filter citing works published on/before this date (YYYY-MM-DD)."),
     per_page: Optional[int] = typer.Option(
         200,
         "--per-page",
